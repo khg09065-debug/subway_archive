@@ -1,0 +1,72 @@
+/* 기본 레이아웃 */
+body, html, #root {
+  margin: 0; padding: 0; height: 100%; width: 100%;
+  background-color: #000; font-family: 'Malgun Gothic', sans-serif;
+}
+
+.dashboard-container { display: flex; height: 100vh; width: 100vw; }
+
+/* 사이드바 디자인 */
+.sidebar {
+  width: 300px; background-color: #111; color: #fff;
+  padding: 30px 20px; z-index: 1000;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.5); flex-shrink: 0;
+}
+
+.sidebar h1 {
+  font-size: 20px; margin-bottom: 40px; text-align: center;
+  border-bottom: 1px solid #333; padding-bottom: 15px;
+}
+
+/* 상세 정보 카드 */
+.detail-card {
+  background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid #333;
+}
+
+.line-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  color: #fff; margin-bottom: 10px; display: inline-block;
+}
+
+.detail-card h2 { margin: 0 0 20px 0; font-size: 24px; }
+
+.cluster-result {
+  background: #222; padding: 15px; border-radius: 10px;
+  text-align: center; margin-bottom: 20px;
+}
+
+.cluster-value { font-size: 28px; font-weight: bold; color: #10B981; }
+
+.info-row {
+  display: flex; justify-content: space-between;
+  margin-bottom: 10px; font-size: 14px; color: #ccc;
+}
+
+.reset-btn {
+  width: 100%; margin-top: 20px; padding: 10px;
+  background: #333; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+}
+
+/* 기본 상태 가이드 */
+.stats-box {
+  text-align: center; padding: 20px; background: #1a1a1a; border-radius: 12px;
+}
+
+.stats-box span { color: #10B981; font-size: 24px; font-weight: bold; }
+
+.hint { font-size: 13px; color: #666; margin: 20px 0; line-height: 1.6; }
+
+.legend-list {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 5px; text-align: left; margin-top: 20px;
+}
+
+.legend-item { font-size: 10px; color: #888; display: flex; align-items: center; }
+.legend-item span { width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+
+/* 지도 영역 */
+.map-area { flex-grow: 1; height: 100%; position: relative; }
+.leaflet-container { width: 100%; height: 100%; background: #0b0b0b !important; }
+
+/* 팝업 커스텀 스타일 */
+.leaflet-popup-content-wrapper { background: #fff; border-radius: 8px; }
+.leaflet-popup-tip { background: #fff; }
