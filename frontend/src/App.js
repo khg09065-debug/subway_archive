@@ -3,101 +3,134 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import './App.css';
-
-const lineColors = {
-  '1호선': '#0052A4', '2호선': '#00A84D', '3호선': '#EF7C1C', '4호선': '#00A5DE',
-  '5호선': '#996CAC', '6호선': '#CD7C2F', '7호선': '#747F00', '8호선': '#E6186C',
-  '9호선': '#BB8336', '수인분당선': '#F5A200', '경의중앙선': '#77C4A3', '신분당선': '#D4003B',
-  '우이신설선': '#B0AD00', '공항철도': '#0090D2', '경춘선': '#1AB878'
-};
+import { lineColors, clusterInfo, brandCategories, tileLayers } from './constants';
 
 function App() {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const layerGroupRef = useRef(null);
-  const [stations, setStations] = useState([]);
+  const tileLayerRef = useRef(null);
+  
+  const [allStations, setAllStations] = useState([]);
+  const [displayStations, setDisplayStations] = useState([]);
   const [selectedStation, setSelectedStation] = useState(null);
+  const [filterRegion, setFilterRegion] = useState(''); 
+  const [mapMode, setMapMode] = useState('dark');
 
   useEffect(() => {
     axios.get('http://localhost:8000/api/stations')
-      .then(res => setStations(res.data))
+      .then(res => setAllStations(res.data))
       .catch(err => console.error(err));
   }, []);
 
   useEffect(() => {
+    if (filterRegion === '') {
+      setDisplayStations([]);
+    } else if (filterRegion === '전체') {
+      setDisplayStations(allStations);
+    } else {
+      setDisplayStations(allStations.filter(st => st.지역 === filterRegion));
+    }
+    setSelectedStation(null);
+  }, [filterRegion, allStations]);
+
+  useEffect(() => {
     if (!mapRef.current) return;
     if (!mapInstance.current) {
-      mapInstance.current = L.map(mapRef.current).setView([37.5665, 126.978], 12);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapInstance.current);
+      mapInstance.current = L.map(mapRef.current, {
+        zoomAnimation: true,
+        fadeAnimation: true
+      }).setView([37.5665, 126.978], 11);
       layerGroupRef.current = L.layerGroup().addTo(mapInstance.current);
     }
 
+    if (tileLayerRef.current) {
+      mapInstance.current.removeLayer(tileLayerRef.current);
+    }
+    
+    tileLayerRef.current = L.tileLayer(tileLayers[mapMode], {
+      attribution: '&copy; CARTO',
+      tileSize: 256,
+      zoomOffset: 0
+    }).addTo(mapInstance.current);
+
+  }, [mapMode]);
+
+  useEffect(() => {
     if (layerGroupRef.current) layerGroupRef.current.clearLayers();
 
-    stations.forEach(st => {
+    displayStations.forEach(st => {
       if (st.위도 && st.경도) {
         const color = lineColors[st.노선명] || '#9CA3AF';
-        
-        // 둥그런 점(마커) 생성
         const marker = L.circleMarker([st.위도, st.경도], {
-          radius: 6,
-          fillColor: color,
-          color: '#fff',
-          weight: 1,
-          fillOpacity: 0.8
+          radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8
         });
 
-        // 클릭 시에만 이름이 보이는 팝업 설정
-        marker.bindPopup(`
-          <div style="text-align:center; font-family: 'Malgun Gothic'; min-width: 80px;">
-            <b style="font-size:14px; color:${color}">${st.역명}</b><br/>
-            <span style="font-size:11px; color:#555;">${st.노선명}</span>
-          </div>
-        `, { closeButton: false, offset: [0, -5] });
-
-        // 마커 클릭 시 이벤트
+        marker.bindPopup(`<div style="text-align:center;"><b>${st.역명}</b><br/>${st.노선명}</div>`, { closeButton: false });
+        
         marker.on('click', () => {
-          setSelectedStation(st); // 사이드바 데이터 업데이트
-          marker.openPopup();    // 지도 위 팝업 표시
+          setSelectedStation(st);
+          marker.openPopup();
         });
 
         marker.addTo(layerGroupRef.current);
       }
     });
-  }, [stations]);
+  }, [displayStations]);
 
   return (
-    <div className="dashboard-container">
+    <div className={`dashboard-container mode-${mapMode}`}>
       <div className="sidebar">
-        <h1>서울 상권 분석</h1>
+        <h1>수도권 상권 분석</h1>
+        <div className="mode-toggle">
+          <button className={mapMode === 'light' ? 'active' : ''} onClick={() => setMapMode('light')}>라이트</button>
+          <button className={mapMode === 'dark' ? 'active' : ''} onClick={() => setMapMode('dark')}>다크</button>
+        </div>
+        <div className="region-tabs">
+          {['전체', '서울', '경기', '인천'].map(r => (
+            <button key={r} className={filterRegion === r ? 'active' : ''} onClick={() => setFilterRegion(r)}>{r}</button>
+          ))}
+        </div>
         <div className="content-area">
           {selectedStation ? (
             <div className="detail-card">
               <span className="line-badge" style={{backgroundColor: lineColors[selectedStation.노선명]}}>{selectedStation.노선명}</span>
               <h2>{selectedStation.역명}</h2>
-              <div className="cluster-result">
-                <p>클러스터 결과</p>
-                <div className="cluster-value">Cluster {selectedStation.클러스터}</div>
+              <div className="cluster-tag">{clusterInfo[selectedStation.클러스터].name}</div>
+              <div className="info-grid">
+                <div className="info-item"><span>승하차객</span><strong>{selectedStation.총_승하차객수?.toLocaleString()}명</strong></div>
+                <div className="info-item"><span>브랜드 밀도</span><strong>{selectedStation.브랜드_밀도}개</strong></div>
+                <div className="info-item"><span>프리미엄 비율</span><strong className="text-premium">{(selectedStation.프리미엄_비율 * 100).toFixed(0)}%</strong></div>
+                <div className="info-item"><span>가성비 비율</span><strong className="text-budget">{(selectedStation.가성비_비율 * 100).toFixed(0)}%</strong></div>
               </div>
-              <div className="info-row">
-                <span>승하차객:</span> <strong>{selectedStation.총_승하차객수?.toLocaleString()}명</strong>
-              </div>
-              <div className="info-row">
-                <span>브랜드 밀도:</span> <strong>{selectedStation.브랜드_밀도}</strong>
-              </div>
-              <button className="reset-btn" onClick={() => setSelectedStation(null)}>전체 통계 보기</button>
+              <button className="reset-btn" onClick={() => setSelectedStation(null)}>분석 가이드 보기</button>
             </div>
           ) : (
-            <div className="stats-box">
-              <p>분석 대상 역: <span>{stations.length}</span>개</p>
-              <p className="hint">지도의 컬러 점을 클릭하면<br/>역 이름과 상세 분석이 나타납니다.</p>
-              <div className="legend-list">
-                {Object.entries(lineColors).slice(0, 9).map(([line, col]) => (
-                  <div key={line} className="legend-item">
-                    <span style={{backgroundColor: col}}></span>{line}
+            <div className="guide-area">
+              <div className="guide-section">
+                <h3>상권 클러스터 유형</h3>
+                {Object.entries(clusterInfo).map(([key, info]) => (
+                  <div key={key} className="guide-item">
+                    <b className="cluster-label">Cluster {key}</b>: <span>{info.name}</span>
+                    <p>{info.desc}</p>
                   </div>
                 ))}
               </div>
+              <div className="guide-section">
+                <h3>브랜드 분류 기준</h3>
+                <div className="brand-list premium">
+                  <b>Premium:</b> {brandCategories.premium.join(', ')}
+                </div>
+                <div className="brand-list budget">
+                  <b>Value:</b> {brandCategories.value.join(', ')}
+                </div>
+              </div>
+              {filterRegion === '' && (
+                <div className="start-msg">
+                  <div className="pulse"></div>
+                  <p>지역을 선택하여 분석을 시작하세요</p>
+                </div>
+              )}
             </div>
           )}
         </div>

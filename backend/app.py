@@ -8,8 +8,7 @@ CORS(app)
 
 @app.route('/api/stations', methods=['GET'])
 def get_stations():
-    file_path = '역세권_상권분석_서울_v2.csv'
-    
+    file_path = '역세권_상권분석_수도권_통합.csv'
     if not os.path.exists(file_path):
         return jsonify({"error": "데이터 파일을 찾을 수 없습니다."}), 404
     
