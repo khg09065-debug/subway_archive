@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './BrandAnalyzer.css';
+import { lineColors } from './constants'; // 노선 색상 데이터 임포트
 
-function BrandAnalyzer({ brand, onClose }) {
-  const [data, setData] = useState([]);
+function BrandAnalyzer({ brand, mode, onClose }) {
+  const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedStation, setExpandedStation] = useState(null);
+  const [expandedLines, setExpandedLines] = useState(new Set());
 
   useEffect(() => {
     setLoading(true);
     axios.get(`http://localhost:8000/api/brand-analysis?brand=${brand}`)
       .then(res => {
-        // 백엔드에서 받은 데이터를 노선별로 그룹화
-        const grouped = res.data.reduce((acc, curr) => {
+        const sorted = res.data.sort((a, b) => {
+          if (a.line !== b.line) return a.line.localeCompare(b.line);
+          return parseInt(a.station_id) - parseInt(b.station_id);
+        });
+        const grouped = sorted.reduce((acc, curr) => {
           if (!acc[curr.line]) acc[curr.line] = [];
           acc[curr.line].push(curr);
           return acc;
@@ -21,63 +26,77 @@ function BrandAnalyzer({ brand, onClose }) {
         setLoading(false);
       })
       .catch(err => {
-        console.error("브랜드 분석 데이터 로딩 실패:", err);
+        console.error(err);
         setLoading(false);
       });
   }, [brand]);
 
+  const toggleLine = (lineName) => {
+    const newExpanded = new Set(expandedLines);
+    if (newExpanded.has(lineName)) {
+      newExpanded.delete(lineName);
+    } else {
+      newExpanded.add(lineName);
+    }
+    setExpandedLines(newExpanded);
+  };
+
   if (loading) return (
-    <div className="brand-analyzer-overlay">
-      <div className="analyzer-loading">☕ {brand} 입점 데이터를 분석하고 있습니다...</div>
+    <div className={`analyzer-container mode-${mode}`}>
+      <div className="analyzer-loading">☕ {brand} 데이터를 분석하고 있습니다...</div>
     </div>
   );
 
   return (
-    <div className="brand-analyzer-overlay">
-      <div className="analyzer-content">
-        <div className="analyzer-header">
-          <h2><span>{brand}</span> 입점 역 탐색 (반경 500m)</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
-        </div>
+    <div className={`analyzer-container mode-${mode}`}>
+      <div className="analyzer-header">
+        <h2><span>{brand}</span> 입점 역 탐색</h2>
+        <button className="close-btn" onClick={onClose}>
+          <span className="icon">✕</span> 지도 돌아가기
+        </button>
+      </div>
 
-        <div className="analyzer-body">
-          {Object.keys(data).length === 0 ? (
-            <div className="no-data">해당 브랜드가 입점한 역 정보를 찾을 수 없습니다.</div>
-          ) : (
-            Object.entries(data).map(([line, stations]) => (
-              <div key={line} className="line-section">
-                <h4 className="line-title">{line}</h4>
-                <div className="station-grid">
-                  {stations.map(st => (
-                    <div key={st.station_id} className="station-wrapper">
-                      <button 
-                        className={`analyzer-st-btn ${expandedStation === st.station_id ? 'active' : ''}`}
-                        onClick={() => setExpandedStation(expandedStation === st.station_id ? null : st.station_id)}
-                      >
-                        {st.station_name} <small className="store-count">{st.stores.length}</small>
-                      </button>
-                      
-                      {/* 역 버튼 클릭 시 매장 상세 리스트 팝업 */}
-                      {expandedStation === st.station_id && (
-                        <div className="store-list-popup">
-                          <div className="popup-arrow"></div>
-                          <ul className="store-list">
-                            {st.stores.map((store, idx) => (
-                              <li key={idx}>
-                                <strong className="store-name">{store.name}</strong>
-                                <p className="store-addr">{store.address}</p>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+      <div className="analyzer-body">
+        {Object.entries(data).map(([line, stations]) => (
+          <div key={line} className="line-section-block">
+            <button 
+              className={`line-toggle-btn ${expandedLines.has(line) ? 'open' : ''}`} 
+              onClick={() => toggleLine(line)}
+              // 인라인 스타일로 고유 노선 색상 적용
+              style={{ borderLeftColor: lineColors[line] || '#10B981' }}
+            >
+              <span className="line-name">{line}</span>
+              <span className="line-info">{stations.length}개 역 입점 {expandedLines.has(line) ? '▲' : '▼'}</span>
+            </button>
+
+            {expandedLines.has(line) && (
+              <div className="station-3-grid animate-fade">
+                {stations.map(st => (
+                  <div key={st.station_id} className="st-wrapper">
+                    <button 
+                      className={`st-btn ${expandedStation === st.station_id ? 'active' : ''}`}
+                      onClick={() => setExpandedStation(expandedStation === st.station_id ? null : st.station_id)}
+                    >
+                      <span className="name">{st.station_name}</span>
+                      <span className="count">{st.stores.length}</span>
+                    </button>
+                    
+                    {expandedStation === st.station_id && (
+                      <div className="st-popover">
+                        {st.stores.map((store, idx) => (
+                          <div key={idx} className="popover-item">
+                            <div className="p-name">{store.name}</div>
+                            <div className="p-addr">{store.address}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))
-          )}
-        </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import './App.css';
-import BrandAnalyzer from './BrandAnalyzer'; // [추가] 분석 컴포넌트 임포트
+import BrandAnalyzer from './BrandAnalyzer';
 import { lineColors, clusterInfo, brandCategories, tileLayers } from './constants';
 
 function App() {
@@ -20,7 +20,6 @@ function App() {
   const [filterRegion, setFilterRegion] = useState('');
   const [mapMode, setMapMode] = useState('dark');
   
-  // [추가] 분석할 브랜드를 관리하는 상태
   const [activeAnalysisBrand, setActiveAnalysisBrand] = useState(null);
 
   useEffect(() => {
@@ -40,14 +39,22 @@ function App() {
     setDisplayStations(filtered);
     setSelectedStation(null);
 
-    if (filtered.length > 0 && mapInstance.current) {
+    if (!activeAnalysisBrand && filtered.length > 0 && mapInstance.current) {
       const lats = filtered.map(s => s.위도);
       const lons = filtered.map(s => s.경도);
       mapInstance.current.fitBounds(L.latLngBounds([Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]).pad(0.1));
     }
-  }, [filterRegion, allStations]);
+  }, [filterRegion, allStations, activeAnalysisBrand]);
 
   useEffect(() => {
+    if (activeAnalysisBrand) {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+      return;
+    }
+
     if (!mapRef.current) return;
     if (!mapInstance.current) {
       mapInstance.current = L.map(mapRef.current).setView([36.5, 127.8], 7);
@@ -56,9 +63,11 @@ function App() {
     }
     if (tileLayerRef.current) mapInstance.current.removeLayer(tileLayerRef.current);
     tileLayerRef.current = L.tileLayer(tileLayers[mapMode], { tileSize: 256, zoomOffset: 0 }).addTo(mapInstance.current);
-  }, [mapMode]);
+  }, [mapMode, activeAnalysisBrand]);
 
   useEffect(() => {
+    if (!mapInstance.current || activeAnalysisBrand) return;
+
     if (layerGroupRef.current) layerGroupRef.current.clearLayers();
     if (polylineGroupRef.current) polylineGroupRef.current.clearLayers();
 
@@ -75,9 +84,7 @@ function App() {
       for (let i = 0; i < stationsInLine.length - 1; i++) {
         const s1 = stationsInLine[i];
         const s2 = stationsInLine[i + 1];
-
         if (!visibleKeys.has(s1.역명 + s1.노선명) || !visibleKeys.has(s2.역명 + s2.노선명)) continue;
-
         const dist = Math.sqrt(Math.pow(s1.위도 - s2.위도, 2) + Math.pow(s1.경도 - s2.경도, 2));
         
         const isException = 
@@ -92,9 +99,7 @@ function App() {
         const maxDist = relaxedLines.includes(lineName) ? 0.8 : 0.05;
 
         if (dist > maxDist && !isException) continue;
-
         if (lineName === '2호선' && s1.역명 === '도림천' && s2.역명 === '신설동') continue;
-        if (lineName === '2호선' && s1.역명 === '신설동' && s2.역명 === '도림천') continue;
         if (lineName === '1호선' && s1.역명 === '온수' && s2.역명 === '가산디지털단지') continue;
         if (lineName === '경의중앙선' && s1.역명 === '서울역' && s2.역명 === '홍대입구') continue;
         if (lineName === '2호선' && s1.역명 === '충정로' && s2.역명 === '용답') continue;
@@ -105,7 +110,6 @@ function App() {
       }
 
       const findVis = (name) => stationsInLine.find(s => s.역명 === name && visibleKeys.has(s.역명 + s.노선명));
-
       if (lineName === '1호선') {
         const guro = findVis('구로'), guil = findVis('구일'), gasan = findVis('가산디지털단지');
         if (guro && guil) L.polyline([[guro.위도, guro.경도], [guil.위도, guil.경도]], {color, weight:3, opacity:0.5}).addTo(polylineGroupRef.current);
@@ -146,7 +150,7 @@ function App() {
         marker.on('click', () => { setSelectedStation(st); });
       }
     });
-  }, [displayStations, allStations, filterRegion]);
+  }, [displayStations, allStations, filterRegion, activeAnalysisBrand]);
 
   const getSelectedStationLines = () => {
     if (!selectedStation) return [];
@@ -162,26 +166,15 @@ function App() {
       s.지역 === selectedStation.지역 && 
       s.노선명 === lineName
     );
-    if (targetData) {
-      setSelectedStation(targetData);
-    }
+    if (targetData) setSelectedStation(targetData);
   };
 
-  // [추가] 브랜드 버튼 클릭 처리 함수
   const handleBrandClick = (brandName) => {
     setActiveAnalysisBrand(brandName);
   };
 
   return (
     <div className={`dashboard-container mode-${mapMode}`}>
-      {/* [추가] 브랜드 분석창 연동 */}
-      {activeAnalysisBrand && (
-        <BrandAnalyzer 
-          brand={activeAnalysisBrand} 
-          onClose={() => setActiveAnalysisBrand(null)} 
-        />
-      )}
-
       <div className="sidebar">
         <div className="sidebar-top">
           <h1>전국 역세권 상권분석</h1>
@@ -213,6 +206,7 @@ function App() {
                   <div className="info-item"><span>프리미엄 비율</span><strong className="text-premium">{(selectedStation.프리미엄_비율 * 100).toFixed(0)}%</strong></div>
                   <div className="info-item"><span>가성비 비율</span><strong className="text-budget">{(selectedStation.가성비_비율 * 100).toFixed(0)}%</strong></div>
                 </div>
+                {/* 초기화 버튼을 info-grid 아래로 배치 */}
                 <button className="reset-pill-btn" onClick={() => setSelectedStation(null)}>가이드 보기</button>
               </div>
             ) : (
@@ -255,7 +249,18 @@ function App() {
           </div>
         </div>
       </div>
-      <div ref={mapRef} className="map-area" />
+
+      <div className="main-display-area">
+        {activeAnalysisBrand ? (
+          <BrandAnalyzer 
+            brand={activeAnalysisBrand} 
+            mode={mapMode} 
+            onClose={() => setActiveAnalysisBrand(null)} 
+          />
+        ) : (
+          <div ref={mapRef} className="map-area" />
+        )}
+      </div>
     </div>
   );
 }
