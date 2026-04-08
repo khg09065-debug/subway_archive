@@ -1,0 +1,150 @@
+/* --- [6] 브랜드 분석 페이지 (3열 그리드 및 테마 연동) --- */
+.analyzer-container {
+    flex: 1;
+    height: 100vh;
+    padding: 40px;
+    overflow-y: auto;
+}
+
+.mode-dark .analyzer-container {
+    background-color: #0f1115;
+    color: #ffffff;
+}
+
+.mode-light .analyzer-container {
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.analyzer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.mode-light .analyzer-header {
+    border-bottom-color: #e5e7eb;
+}
+
+.analyzer-header h2 span {
+    color: #10B981;
+}
+
+.mode-light .analyzer-header h2 span {
+    color: #047857;
+}
+
+.line-section-block {
+    margin-bottom: 35px;
+}
+
+.line-name-badge {
+    display: inline-block;
+    padding: 5px 15px;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10B981;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 16px;
+    border-left: 4px solid #10B981;
+}
+
+.mode-light .line-name-badge {
+    color: #047857;
+    border-left-color: #047857;
+}
+
+/* 3열 그리드 레이아웃 */
+.station-3-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.st-wrapper {
+    position: relative;
+}
+
+.st-btn {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 18px;
+    background: #1e2229;
+    border: 1px solid #333;
+    border-radius: 12px;
+    color: #fff;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.mode-light .st-btn {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #1f2937;
+}
+
+.st-btn:hover, 
+.st-btn.active {
+    border-color: #10B981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.st-btn .count {
+    font-size: 12px;
+    background: #10B981;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* 역 상세 매장 리스트 팝오버 */
+.st-popover {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #252a33;
+    border: 1px solid #444;
+    border-radius: 12px;
+    margin-top: 8px;
+    padding: 15px;
+    z-index: 2000;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.mode-light .st-popover {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.popover-item {
+    margin-bottom: 12px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+.mode-light .popover-item {
+    border-bottom-color: #f3f4f6;
+}
+
+.p-name {
+    font-weight: bold;
+    color: #10B981;
+    font-size: 13px;
+}
+
+.mode-light .p-name {
+    color: #047857;
+}
+
+.p-addr {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 4px;
+}

@@ -12,3 +12,5 @@ axios
 onnxruntime
 sqlalchemy
 streamlit
+pymysql
+cryptography
