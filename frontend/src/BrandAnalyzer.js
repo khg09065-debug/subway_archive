@@ -13,15 +13,19 @@ function BrandAnalyzer({ brand, mode, onClose }) {
         setLoading(true);
         axios.get(`http://localhost:8000/api/brand-analysis?brand=${brand}`)
             .then(res => {
+                // 노선명 가나다순, 역번호 숫자순으로 데이터 정렬
                 const sorted = res.data.sort((a, b) => {
                     if (a.line !== b.line) return a.line.localeCompare(b.line);
                     return parseInt(a.station_id) - parseInt(b.station_id);
                 });
+
+                // 노선별로 데이터 그룹화
                 const grouped = sorted.reduce((acc, curr) => {
                     if (!acc[curr.line]) acc[curr.line] = [];
                     acc[curr.line].push(curr);
                     return acc;
                 }, {});
+                
                 setData(grouped);
                 setLoading(false);
             })
@@ -31,13 +35,22 @@ function BrandAnalyzer({ brand, mode, onClose }) {
             });
     }, [brand]);
 
+    // m 단위 거리 계산 함수 (Haversine 공식 적용)
+    const getDistMeters = (lat1, lon1, lat2, lon2) => {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        const R = 6371000; 
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+    };
+
     const toggleLine = (lineName) => {
         const next = new Set(expandedLines);
-        if (next.has(lineName)) {
-            next.delete(lineName);
-        } else {
-            next.add(lineName);
-        }
+        next.has(lineName) ? next.delete(lineName) : next.add(lineName);
         setExpandedLines(next);
     };
 
@@ -65,11 +78,11 @@ function BrandAnalyzer({ brand, mode, onClose }) {
                             style={{ borderLeftColor: lineColors[line] || '#10B981' }}
                         >
                             <span className="line-name">{line}</span>
-                            <span className="line-info">{stations.length}개 역 {expandedLines.has(line) ? '▲' : '▼'}</span>
+                            <span className="line-info">{stations.length}개 역 입점 {expandedLines.has(line) ? '▲' : '▼'}</span>
                         </button>
 
                         {expandedLines.has(line) && (
-                            <div className="station-3-grid animate-fade">
+                            <div className="station-3-grid">
                                 {stations.map(st => (
                                     <div key={st.station_id} className="st-wrapper">
                                         <button 
@@ -82,12 +95,23 @@ function BrandAnalyzer({ brand, mode, onClose }) {
                                         
                                         {expandedStation === st.station_id && (
                                             <div className="st-popover">
-                                                {st.stores.map((store, idx) => (
-                                                    <div key={idx} className="popover-item">
-                                                        <div className="p-name">{store.name}</div>
-                                                        <div className="p-addr">{store.address}</div>
-                                                    </div>
-                                                ))}
+                                                {/* 매장 리스트를 렌더링 전 거리 계산 및 가까운 순 정렬 수행 */}
+                                                {st.stores
+                                                    .map(store => ({
+                                                        ...store,
+                                                        distance: getDistMeters(st.station_lat, st.station_lon, store.lat, store.lon)
+                                                    }))
+                                                    .sort((a, b) => a.distance - b.distance)
+                                                    .map((store, idx) => (
+                                                        <div key={idx} className="popover-item">
+                                                            <div className="p-header">
+                                                                <strong className="p-name">{store.name}</strong>
+                                                                <span className="p-dist">{store.distance}m</span>
+                                                            </div>
+                                                            <div className="p-addr">{store.address}</div>
+                                                        </div>
+                                                    ))
+                                                }
                                             </div>
                                         )}
                                     </div>
@@ -96,7 +120,6 @@ function BrandAnalyzer({ brand, mode, onClose }) {
                         )}
                     </div>
                 ))}
-                {/* [스크롤 해결책] 마지막 노선 아래에 충분한 공간을 확보하는 스페이서 */}
                 <div className="analyzer-footer-spacer"></div>
             </div>
         </div>

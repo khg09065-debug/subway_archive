@@ -4,6 +4,7 @@
     padding: 40px 40px 0 40px;
     overflow-y: auto;
     box-sizing: border-box;
+    padding-bottom: 50px;
 }
 
 .mode-dark .analyzer-container {
@@ -48,11 +49,6 @@
     transition: all 0.2s ease;
 }
 
-.close-btn:hover {
-    background: #10B981;
-    color: #fff;
-}
-
 .line-section-block {
     margin-bottom: 15px;
 }
@@ -78,16 +74,6 @@
     color: #1f2937;
 }
 
-.line-name {
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.line-info {
-    font-size: 13px;
-    color: #9ca3af;
-}
-
 .station-3-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -110,29 +96,28 @@
     border-radius: 10px;
     color: #fff;
     cursor: pointer;
-    transition: 0.2s;
 }
 
-.mode-light .st-btn {
-    background: #ffffff;
-    border-color: #d1d5db;
-    color: #1f2937;
-}
-
-.st-btn:hover, 
 .st-btn.active {
     border-color: #10B981;
-    background: rgba(16, 185, 129, 0.05);
+    background: rgba(16, 185, 129, 0.1);
 }
 
-.st-btn .count {
-    font-size: 11px;
-    background: #10B981;
-    color: #fff;
-    padding: 2px 7px;
-    border-radius: 8px;
+/* 라이트 모드: 버튼의 원래 상태 (기본 흰색) */
+.mode-light .st-btn {
+    background-color: #ffffff;
+    color: #1f2937;
+    border-color: #d1d5db;
 }
 
+/* 라이트 모드: 버튼을 클릭했을 때 (흰색 유지 + 글자 검정) */
+.mode-light .st-btn.active {
+    background-color: #ffffff;
+    color: #000000;
+    border-color: #10B981;
+}
+
+/* --- [핵심 수정] 팝오버 5개 제한 및 스크롤 --- */
 .st-popover {
     position: absolute;
     top: 100%;
@@ -142,15 +127,26 @@
     border: 1px solid #10B981;
     border-radius: 12px;
     margin-top: 8px;
-    padding: 15px;
+    padding: 12px;
     z-index: 2000;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    max-height: 280px;
+    overflow-y: auto;
 }
 
 .mode-light .st-popover {
     background: #ffffff;
     border-color: #e5e7eb;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* 스크롤바 커스텀 */
+.st-popover::-webkit-scrollbar {
+    width: 4px;
+}
+
+.st-popover::-webkit-scrollbar-thumb {
+    background: #10B981;
+    border-radius: 10px;
 }
 
 .popover-item {
@@ -159,8 +155,20 @@
     padding-bottom: 8px;
 }
 
+.mode-light .popover-item {
+    border-bottom-color: #f3f4f6;
+}
+
 .popover-item:last-child {
     border-bottom: none;
+}
+
+/* 가게명과 거리 정렬 */
+.p-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
 }
 
 .p-name {
@@ -169,16 +177,18 @@
     font-size: 13px;
 }
 
+.p-dist {
+    font-size: 11px;
+    color: #fbbf24;
+    font-weight: bold;
+}
+
 .p-addr {
     font-size: 11px;
     color: #9ca3af;
-    margin-top: 4px;
 }
 
-/* [스크롤 해결 핵심] 하단에 강력한 여백 확보 */
 .analyzer-footer-spacer {
-    height: 50px;
+    height: 100px;
     width: 100%;
-    display: block;
-    content: "";
 }
