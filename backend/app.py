@@ -76,7 +76,7 @@ def run_realtime_clustering():
     
     # 2. 정제된 지하철 역사 데이터를 읽어옵니다.
     print("📂 [2/4] CSV 역사 정보를 불러오는 중...")
-    station_df = pd.read_csv('전체_역사정보_최종_정제_v43.csv')
+    station_df = pd.read_csv('전체_역사정보_최종_정제_v47.csv')
     stations = station_df.dropna(subset=['위도', '경도']).copy()
     stations['총_승하차객수'] = stations['1월 승차이용객수'] + stations['1월 하차이용객수']
 
