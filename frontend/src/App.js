@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import './App.css';
 import BrandAnalyzer from './BrandAnalyzer';
-import { lineColors, clusterInfo, brandCategories, tileLayers } from './constants';
+import { lineColors, brandCategories, tileLayers } from './constants'; 
 import { bridgeWaypoints, isStraightSegment } from './bridgeWaypoints';
 
 function App() {
@@ -22,6 +22,7 @@ function App() {
     const [mapMode, setMapMode] = useState('dark');
     const [activeAnalysisBrand, setActiveAnalysisBrand] = useState(null);
 
+    // [기능 유지] 베지어 곡선 계산 함수
     const getBezierPoints = (p1, p2, waypoint = null, isWeak = false) => {
         const start = [p1.위도, p1.경도];
         const end = [p2.위도, p2.경도];
@@ -46,6 +47,7 @@ function App() {
         return points;
     };
 
+    // [기능 유지] 데이터 로드 및 전처리
     useEffect(() => {
         axios.get('http://localhost:8000/api/stations')
             .then(res => {
@@ -100,6 +102,30 @@ function App() {
 
         const visibleKeys = new Set(displayStations.map(s => s.역명 + s.노선명));
         const lineNames = [...new Set(allStations.map(s => s.노선명))];
+        const renderedSegments = new Set();
+
+        // [기능 유지] 공통 선 그리기 함수
+        const drawLine = (s1, s2, color) => {
+            if (!s1 || !s2) return;
+            const segmentKey = [s1.역명, s2.역명].sort().join('|') + color;
+            if (renderedSegments.has(segmentKey)) return;
+
+            const pairKey = `${s1.역명}-${s2.역명}`;
+            const bridgePoint = bridgeWaypoints[pairKey] || bridgeWaypoints[`${s2.역명}-${s1.역명}`];
+            let points;
+
+            if (bridgePoint && (isStraightSegment(pairKey) || Array.isArray(bridgePoint[0]))) {
+                points = Array.isArray(bridgePoint[0]) ? [[s1.위도, s1.경도], ...bridgePoint, [s2.위도, s2.경도]] : [[s1.위도, s1.경도], bridgePoint, [s2.위도, s2.경도]];
+            } else if (bridgePoint) {
+                const isWeak = pairKey.includes("상도") || pairKey.includes("장승배기") || pairKey.includes("구의") || pairKey.includes("강변") || pairKey.includes("한양대") || pairKey.includes("뚝섬");
+                points = getBezierPoints(s1, s2, bridgePoint, isWeak);
+            } else {
+                points = [[s1.위도, s1.경도], [s2.위도, s2.경도]];
+            }
+
+            L.polyline(points, { color, weight: 3, opacity: 0.6, smoothFactor: 1.5, lineJoin: 'round' }).addTo(polylineGroupRef.current);
+            renderedSegments.add(segmentKey);
+        };
 
         lineNames.forEach(lineName => {
             const stationsInLine = allStations
@@ -108,71 +134,35 @@ function App() {
 
             const color = lineColors[lineName] || '#9CA3AF';
 
+            // [기능 유지] 기본 연결 및 예외 조건
             for (let i = 0; i < stationsInLine.length - 1; i++) {
                 const s1 = stationsInLine[i];
                 const s2 = stationsInLine[i + 1];
-                
                 if (!visibleKeys.has(s1.역명 + s1.노선명) || !visibleKeys.has(s2.역명 + s2.노선명)) continue;
 
                 const dist = Math.sqrt(Math.pow(s1.위도 - s2.위도, 2) + Math.pow(s1.경도 - s2.경도, 2));
-                
                 const isNaturalConnection = (s1.역명 === '별내별가람' && s2.역명 === '오남') || (s1.역명 === '오남' && s2.역명 === '진접');
-                const isException = 
-                    ((s1.역명 === '오목천' && s2.역명 === '어천')) || 
-                    ((s1.역명 === '마곡나루' && s2.역명 === '디지털미디어시티')) ||
-                    ((s1.역명 === '강촌' && s2.역명 === '김유정'));
-
+                const isException = ((s1.역명 === '오목천' && s2.역명 === '어천')) || ((s1.역명 === '마곡나루' && s2.역명 === '디지털미디어시티')) || ((s1.역명 === '강촌' && s2.역명 === '김유정'));
                 const relaxedLines = ['경강선', '경춘선', '공항철도', '경의중앙선', '수인분당선', '동해선', '대경선', '우이신설선', '4호선'];
                 const maxDist = relaxedLines.includes(lineName) ? 0.8 : 0.05;
 
-                // [최종 수정] 경의중앙선에서 홍대입구-서울역 직통 구간만 제거
-                // 신촌(경의중앙선)-서울역 연결은 stationsInLine의 순서에 따라 보존됨
-                if (lineName === '경의중앙선' && 
-                    ((s1.역명 === '홍대입구' && s2.역명 === '서울역') || (s2.역명 === '홍대입구' && s1.역명 === '서울역'))) {
-                    continue;
-                }
-
+                if (lineName === '경의중앙선' && ((s1.역명 === '홍대입구' && s2.역명 === '서울역') || (s2.역명 === '홍대입구' && s1.역명 === '서울역'))) continue;
+                if (lineName === '1호선' && ((s1.역명 === '서동탄' && s2.역명 === '세마') || (s2.역명 === '세마' && s1.역명 === '서동탄'))) continue;
+                if (lineName === '1호선' && ((s1.역명 === '석수' && s2.역명 === '광명') || (s2.역명 === '광명' && s1.역명 === '석수'))) continue;
                 if (dist > maxDist && !isException && !isNaturalConnection) continue;
 
-                const pairKey = `${s1.역명}-${s2.역명}`;
-                const bridgePoint = bridgeWaypoints[pairKey] || bridgeWaypoints[`${s2.역명}-${s1.역명}`];
-                let points;
-
-                if (bridgePoint && (isStraightSegment(pairKey) || Array.isArray(bridgePoint[0]))) {
-                    points = Array.isArray(bridgePoint[0]) ? [[s1.위도, s1.경도], ...bridgePoint, [s2.위도, s2.경도]] : [[s1.위도, s1.경도], bridgePoint, [s2.위도, s2.경도]];
-                } else if (bridgePoint) {
-                    const isWeak = pairKey.includes("상도") || pairKey.includes("장승배기") || pairKey.includes("구의") || pairKey.includes("강변") || pairKey.includes("한양대") || pairKey.includes("뚝섬");
-                    points = getBezierPoints(s1, s2, bridgePoint, isWeak);
-                } else {
-                    points = [[s1.위도, s1.경도], [s2.위도, s2.경도]];
-                }
-
-                L.polyline(points, { color, weight: 3, opacity: 0.6, smoothFactor: 1.5, lineJoin: 'round' }).addTo(polylineGroupRef.current);
+                drawLine(s1, s2, color);
             }
 
-            // 분기점 로직
+            // [기능 유지] 분기점 로직
             const findVis = (name) => stationsInLine.find(s => s.역명 === name && visibleKeys.has(s.역명 + s.노선명));
-            if (lineName === '1호선') {
-                const guro = findVis('구로'), guil = findVis('구일'), gasan = findVis('가산디지털단지');
-                if (guro && guil) L.polyline(getBezierPoints(guro, guil), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-                if (guro && gasan) L.polyline(getBezierPoints(guro, gasan), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-            }
-            if (lineName === '2호선') {
-                const cjr = findVis('충정로'), sc = findVis('시청'), sd = findVis('신도림'), dt = findVis('도림천'), ss = findVis('성수'), yd = findVis('용답');
-                if (cjr && sc) L.polyline(getBezierPoints(cjr, sc), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-                if (sd && dt) L.polyline(getBezierPoints(sd, dt), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-                if (ss && yd) L.polyline(getBezierPoints(ss, yd), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-            }
-            if (lineName === '5호선') {
-                const gd = findVis('강동'), gildong = findVis('길동'), dc = findVis('둔촌동');
-                if (gd && gildong) L.polyline(getBezierPoints(gd, gildong), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-                if (gd && dc) L.polyline(getBezierPoints(gd, dc), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-            }
-            if (lineName === '경의중앙선') {
-                const gj = findVis('가좌'), sc = findVis('신촌'), hd = findVis('홍대입구');
-                if (gj && sc) L.polyline(getBezierPoints(gj, sc), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-                if (gj && hd) L.polyline(getBezierPoints(gj, hd), {color, weight:3, opacity:0.6}).addTo(polylineGroupRef.current);
-            }
+            if (lineName === '1호선') { drawLine(findVis('구로'), findVis('구일'), color); drawLine(findVis('구로'), findVis('가산디지털단지'), color); 
+                                        drawLine(findVis('연천'), findVis('전곡'), color); drawLine(findVis('병점'), findVis('세마'), color);}
+            if (lineName === '2호선') { drawLine(findVis('충정로'), findVis('시청'), color); drawLine(findVis('신도림'), findVis('도림천'), color); 
+                                        drawLine(findVis('성수'), findVis('용답'), color); }
+            if (lineName === '5호선') { drawLine(findVis('강동'), findVis('길동'), color); drawLine(findVis('강동'), findVis('둔촌동'), color); }
+            if (lineName === '6호선') { drawLine(findVis('구산'), findVis('응암'), color); }
+            if (lineName === '경의중앙선') { drawLine(findVis('가좌'), findVis('신촌'), color); drawLine(findVis('가좌'), findVis('홍대입구'), color); }
         });
 
         displayStations.forEach(st => {
@@ -207,7 +197,10 @@ function App() {
                                     ))}
                                 </div>
                                 <h2>{selectedStation.역명}</h2>
-                                <div className="cluster-tag">{clusterInfo[selectedStation.클러스터].name}</div>
+                                {/* [각색] 정규표현식을 사용하여 괄호 및 내부 내용 제거 */}
+                                <div className="cluster-tag analysis-tag">
+                                    {selectedStation.상권_성격 ? selectedStation.상권_성격.replace(/\s*\(.*?\)/, "") : ""}
+                                </div>
                                 <div className="info-grid">
                                     <div className="info-item"><span>승하차객</span><strong>{selectedStation.총_승하차객수?.toLocaleString()}</strong></div>
                                     <div className="info-item"><span>브랜드 밀도</span><strong>{selectedStation.브랜드_밀도}</strong></div>
@@ -219,24 +212,43 @@ function App() {
                         ) : (
                             <div className="guide-area">
                                 <div className="guide-pill">
-                                    <h3>📊 상권 클러스터 유형</h3>
-                                    {Object.entries(clusterInfo).map(([key, info]) => (
-                                        <div key={key} className="guide-item">
-                                            <b className="cluster-label">Type {key}</b>: <span>{info.name}</span>
-                                            <p>{info.desc}</p>
-                                        </div>
-                                    ))}
+                                    <h3>📊 고도화된 상권 분류 모델</h3>
+                                    
+                                    <div className="guide-item">
+                                        <b className="cluster-label">Type 0. 초대형 핵심 광역 상권</b>
+                                        <p>유동인구가 압도적으로 많고 브랜드 밀도가 전국 최상위권에 해당하며, 광역 단위의 소비가 일어나는 중심 상권입니다.</p>
+                                    </div>
+
+                                    <div className="guide-item">
+                                        <b className="cluster-label">Type 1. 고급/오피스 프리미엄 상권</b>
+                                        <p>비즈니스 지구를 중심으로 직장인 수요가 많으며, 스타벅스 등 프리미엄 브랜드에 대한 선호도와 밀집도가 높은 지역입니다.</p>
+                                    </div>
+
+                                    <div className="guide-item">
+                                        <b className="cluster-label">Type 2. 생활 밀착형 활성 상권</b>
+                                        <p>대학가나 주거 밀집 지역 인근의 번화가로, 가성비 브랜드가 촘촘하게 배치되어 실질적인 소비 활동이 매우 활발한 상권입니다.</p>
+                                    </div>
+
+                                    <div className="guide-item">
+                                        <b className="cluster-label">Type 3. 저밀도 주거/교외 상권</b>
+                                        <p>상업 시설의 밀집도보다는 주거 환경이나 교통 거점으로서의 기능이 강하며, 필수적인 브랜드 위주로 구성된 지역입니다.</p>
+                                    </div>
                                 </div>
+
                                 <div className="guide-pill">
                                     <h3>☕ 브랜드 상세 분석</h3>
                                     <div className="brand-button-container">
                                         <div className="brand-col">
                                             <span className="col-label premium">Premium</span>
-                                            {brandCategories.premium.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
+                                            {brandCategories.premium.map(brand => (
+                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
+                                            ))}
                                         </div>
                                         <div className="brand-col">
                                             <span className="col-label budget">Value</span>
-                                            {brandCategories.value.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
+                                            {brandCategories.value.map(brand => (
+                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
