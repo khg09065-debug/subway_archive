@@ -22,32 +22,42 @@ function App() {
     const [mapMode, setMapMode] = useState('dark');
     const [activeAnalysisBrand, setActiveAnalysisBrand] = useState(null);
 
-    // [기능 유지] 베지어 곡선 계산 함수
-    const getBezierPoints = (p1, p2, waypoint = null, isWeak = false) => {
-        const start = [p1.위도, p1.경도];
-        const end = [p2.위도, p2.경도];
-        if (Array.isArray(waypoint) && Array.isArray(waypoint[0])) return [start, ...waypoint, end];
+    // [추가] 캣멀-롬 스플라인: 점들을 부드럽게 잇는 알고리즘
+    const getSmoothPath = (points, segments = 12) => {
+        if (points.length < 2) return points;
+        if (points.length === 2) return points; // 단순 직선
 
-        const points = [];
-        const count = 40;
-        let cp;
-        if (waypoint) {
-            const weight = isWeak ? 1.5 : 2.0; 
-            cp = [weight * waypoint[0] - (weight - 1) * 0.5 * (start[0] + end[0]), weight * waypoint[1] - (weight - 1) * 0.5 * (start[1] + end[1])];
-        } else {
-            cp = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
-        }
+        const result = [];
+        // 가상의 제어점 추가 (시작과 끝의 곡률 처리)
+        const p = [
+            [2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1]],
+            ...points,
+            [2 * points[points.length-1][0] - points[points.length-2][0], 2 * points[points.length-1][1] - points[points.length-2][1]]
+        ];
 
-        for (let i = 0; i <= count; i++) {
-            const t = i / count;
-            const lat = (1 - t) * (1 - t) * start[0] + 2 * (1 - t) * t * cp[0] + t * t * end[0];
-            const lon = (1 - t) * (1 - t) * start[1] + 2 * (1 - t) * t * cp[1] + t * t * end[1];
-            points.push([lat, lon]);
+        for (let i = 0; i < p.length - 3; i++) {
+            for (let t = 0; t <= 1; t += 1 / segments) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+                const lat = 0.5 * (
+                    (2 * p[i+1][0]) +
+                    (-p[i][0] + p[i+2][0]) * t +
+                    (2 * p[i][0] - 5 * p[i+1][0] + 4 * p[i+2][0] - p[i+3][0]) * t2 +
+                    (-p[i][0] + 3 * p[i+1][0] - 3 * p[i+2][0] + p[i+3][0]) * t3
+                );
+                const lng = 0.5 * (
+                    (2 * p[i+1][1]) +
+                    (-p[i][1] + p[i+2][1]) * t +
+                    (2 * p[i][1] - 5 * p[i+1][1] + 4 * p[i+2][1] - p[i+3][1]) * t2 +
+                    (-p[i][1] + 3 * p[i+1][1] - 3 * p[i+2][1] + p[i+3][1]) * t3
+                );
+                result.push([lat, lng]);
+            }
         }
-        return points;
+        return result;
     };
 
-    // [기능 유지] 데이터 로드 및 전처리
+    // [기존 기능 유지] 데이터 로드 및 초기화
     useEffect(() => {
         axios.get('http://localhost:8000/api/stations')
             .then(res => {
@@ -104,7 +114,7 @@ function App() {
         const lineNames = [...new Set(allStations.map(s => s.노선명))];
         const renderedSegments = new Set();
 
-        // [기능 유지] 공통 선 그리기 함수
+        // [핵심 수정] 선 그리기 함수: bridgeWaypoints를 곡선으로 처리
         const drawLine = (s1, s2, color) => {
             if (!s1 || !s2) return;
             const segmentKey = [s1.역명, s2.역명].sort().join('|') + color;
@@ -112,18 +122,23 @@ function App() {
 
             const pairKey = `${s1.역명}-${s2.역명}`;
             const bridgePoint = bridgeWaypoints[pairKey] || bridgeWaypoints[`${s2.역명}-${s1.역명}`];
-            let points;
+            
+            let rawPoints = [[s1.위도, s1.경도]];
+            if (bridgePoint) {
+                if (Array.isArray(bridgePoint[0])) rawPoints.push(...bridgePoint);
+                else rawPoints.push(bridgePoint);
+            }
+            rawPoints.push([s2.위도, s2.경도]);
 
-            if (bridgePoint && (isStraightSegment(pairKey) || Array.isArray(bridgePoint[0]))) {
-                points = Array.isArray(bridgePoint[0]) ? [[s1.위도, s1.경도], ...bridgePoint, [s2.위도, s2.경도]] : [[s1.위도, s1.경도], bridgePoint, [s2.위도, s2.경도]];
-            } else if (bridgePoint) {
-                const isWeak = pairKey.includes("상도") || pairKey.includes("장승배기") || pairKey.includes("구의") || pairKey.includes("강변") || pairKey.includes("한양대") || pairKey.includes("뚝섬");
-                points = getBezierPoints(s1, s2, bridgePoint, isWeak);
+            let finalPoints;
+            // 직선 구간 설정이 되어있으면 그대로, 아니면 부드러운 곡선 적용
+            if (bridgePoint && isStraightSegment(pairKey)) {
+                finalPoints = rawPoints;
             } else {
-                points = [[s1.위도, s1.경도], [s2.위도, s2.경도]];
+                finalPoints = getSmoothPath(rawPoints);
             }
 
-            L.polyline(points, { color, weight: 3, opacity: 0.6, smoothFactor: 1.5, lineJoin: 'round' }).addTo(polylineGroupRef.current);
+            L.polyline(finalPoints, { color, weight: 3, opacity: 0.6, smoothFactor: 1, lineJoin: 'round' }).addTo(polylineGroupRef.current);
             renderedSegments.add(segmentKey);
         };
 
@@ -134,7 +149,7 @@ function App() {
 
             const color = lineColors[lineName] || '#9CA3AF';
 
-            // [기능 유지] 기본 연결 및 예외 조건
+            // 기본 노선 연결
             for (let i = 0; i < stationsInLine.length - 1; i++) {
                 const s1 = stationsInLine[i];
                 const s2 = stationsInLine[i + 1];
@@ -147,24 +162,37 @@ function App() {
                 const maxDist = relaxedLines.includes(lineName) ? 0.8 : 0.05;
 
                 if (lineName === '경의중앙선' && ((s1.역명 === '홍대입구' && s2.역명 === '서울역') || (s2.역명 === '홍대입구' && s1.역명 === '서울역'))) continue;
-                if (lineName === '1호선' && ((s1.역명 === '서동탄' && s2.역명 === '세마') || (s2.역명 === '세마' && s1.역명 === '서동탄'))) continue;
-                if (lineName === '1호선' && ((s1.역명 === '석수' && s2.역명 === '광명') || (s2.역명 === '광명' && s1.역명 === '석수'))) continue;
                 if (dist > maxDist && !isException && !isNaturalConnection) continue;
 
                 drawLine(s1, s2, color);
             }
 
-            // [기능 유지] 분기점 로직
+            // 분기점 및 인공적 연결 로직 (부드러운 선 적용됨)
             const findVis = (name) => stationsInLine.find(s => s.역명 === name && visibleKeys.has(s.역명 + s.노선명));
-            if (lineName === '1호선') { drawLine(findVis('구로'), findVis('구일'), color); drawLine(findVis('구로'), findVis('가산디지털단지'), color); 
-                                        drawLine(findVis('연천'), findVis('전곡'), color); drawLine(findVis('병점'), findVis('세마'), color);}
-            if (lineName === '2호선') { drawLine(findVis('충정로'), findVis('시청'), color); drawLine(findVis('신도림'), findVis('도림천'), color); 
-                                        drawLine(findVis('성수'), findVis('용답'), color); }
-            if (lineName === '5호선') { drawLine(findVis('강동'), findVis('길동'), color); drawLine(findVis('강동'), findVis('둔촌동'), color); }
-            if (lineName === '6호선') { drawLine(findVis('구산'), findVis('응암'), color); }
-            if (lineName === '경의중앙선') { drawLine(findVis('가좌'), findVis('신촌'), color); drawLine(findVis('가좌'), findVis('홍대입구'), color); }
+            if (lineName === '1호선') { 
+                drawLine(findVis('구로'), findVis('구일'), color); 
+                drawLine(findVis('구로'), findVis('가산디지털단지'), color); 
+                drawLine(findVis('연천'), findVis('전곡'), color); 
+            }
+            if (lineName === '2호선') { 
+                drawLine(findVis('충정로'), findVis('시청'), color); 
+                drawLine(findVis('신도림'), findVis('도림천'), color); 
+                drawLine(findVis('성수'), findVis('용답'), color); 
+            }
+            if (lineName === '5호선') { 
+                drawLine(findVis('강동'), findVis('길동'), color); 
+                drawLine(findVis('강동'), findVis('둔촌동'), color); 
+            }
+            if (lineName === '6호선') { 
+                drawLine(findVis('구산'), findVis('응암'), color); 
+            }
+            if (lineName === '경의중앙선') { 
+                drawLine(findVis('가좌'), findVis('신촌'), color); 
+                drawLine(findVis('가좌'), findVis('홍대입구'), color); 
+            }
         });
 
+        // 마커 렌더링
         displayStations.forEach(st => {
             const squareIcon = L.divIcon({
                 className: 'custom-square-marker',
@@ -197,7 +225,6 @@ function App() {
                                     ))}
                                 </div>
                                 <h2>{selectedStation.역명}</h2>
-                                {/* [각색] 정규표현식을 사용하여 괄호 및 내부 내용 제거 */}
                                 <div className="cluster-tag analysis-tag">
                                     {selectedStation.상권_성격 ? selectedStation.상권_성격.replace(/\s*\(.*?\)/, "") : ""}
                                 </div>
@@ -213,42 +240,33 @@ function App() {
                             <div className="guide-area">
                                 <div className="guide-pill">
                                     <h3>📊 고도화된 상권 분류 모델</h3>
-                                    
                                     <div className="guide-item">
                                         <b className="cluster-label">Type 0. 초대형 핵심 광역 상권</b>
                                         <p>유동인구가 압도적으로 많고 브랜드 밀도가 전국 최상위권에 해당하며, 광역 단위의 소비가 일어나는 중심 상권입니다.</p>
                                     </div>
-
                                     <div className="guide-item">
                                         <b className="cluster-label">Type 1. 고급/오피스 프리미엄 상권</b>
-                                        <p>비즈니스 지구를 중심으로 직장인 수요가 많으며, 스타벅스 등 프리미엄 브랜드에 대한 선호도와 밀집도가 높은 지역입니다.</p>
+                                        <p>비즈니스 지구를 중심으로 직장인 수요가 많으며, 프리미엄 브랜드에 대한 선호도와 밀집도가 높은 지역입니다.</p>
                                     </div>
-
                                     <div className="guide-item">
                                         <b className="cluster-label">Type 2. 생활 밀착형 활성 상권</b>
-                                        <p>대학가나 주거 밀집 지역 인근의 번화가로, 가성비 브랜드가 촘촘하게 배치되어 실질적인 소비 활동이 매우 활발한 상권입니다.</p>
+                                        <p>대학가나 주거 밀집 지역 인근의 번화가로, 가성비 브랜드가 촘촘하게 배치되어 소비 활동이 매우 활발한 상권입니다.</p>
                                     </div>
-
                                     <div className="guide-item">
                                         <b className="cluster-label">Type 3. 저밀도 주거/교외 상권</b>
                                         <p>상업 시설의 밀집도보다는 주거 환경이나 교통 거점으로서의 기능이 강하며, 필수적인 브랜드 위주로 구성된 지역입니다.</p>
                                     </div>
                                 </div>
-
                                 <div className="guide-pill">
                                     <h3>☕ 브랜드 상세 분석</h3>
                                     <div className="brand-button-container">
                                         <div className="brand-col">
                                             <span className="col-label premium">Premium</span>
-                                            {brandCategories.premium.map(brand => (
-                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
-                                            ))}
+                                            {brandCategories.premium.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
                                         </div>
                                         <div className="brand-col">
                                             <span className="col-label budget">Value</span>
-                                            {brandCategories.value.map(brand => (
-                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
-                                            ))}
+                                            {brandCategories.value.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
                                         </div>
                                     </div>
                                 </div>

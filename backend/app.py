@@ -67,7 +67,7 @@ def run_realtime_clustering():
     
     # 1. 데이터 로드 (DB 및 CSV)
     COFFEE_STORES_DF = pd.read_sql("SELECT 브랜드명, 매장명, 주소, 경도, 위도 FROM coffee_chain", engine)
-    station_df = pd.read_csv('전체_역사정보_최종_정제_v48.csv')
+    station_df = pd.read_csv('전체_역사정보_최종_정제_v49.csv')
     stations = station_df.dropna(subset=['위도', '경도']).copy()
     stations['총_승하차객수'] = stations['1월 승차이용객수'] + stations['1월 하차이용객수']
 
