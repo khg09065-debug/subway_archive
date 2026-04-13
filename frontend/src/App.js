@@ -161,6 +161,7 @@ function App() {
                 const relaxedLines = ['경강선', '경춘선', '공항철도', '경의중앙선', '수인분당선', '동해선', '대경선', '우이신설선', '4호선'];
                 const maxDist = relaxedLines.includes(lineName) ? 0.8 : 0.05;
 
+                if (lineName === '1호선' && ((s1.역명 === '석수' && s2.역명 === '광명') || (s1.역명 === '광명' && s2.역명 === '석수'))) continue;
                 if (lineName === '경의중앙선' && ((s1.역명 === '홍대입구' && s2.역명 === '서울역') || (s2.역명 === '홍대입구' && s1.역명 === '서울역'))) continue;
                 if (dist > maxDist && !isException && !isNaturalConnection) continue;
 
@@ -173,6 +174,9 @@ function App() {
                 drawLine(findVis('구로'), findVis('구일'), color); 
                 drawLine(findVis('구로'), findVis('가산디지털단지'), color); 
                 drawLine(findVis('연천'), findVis('전곡'), color); 
+                drawLine(findVis('금천구청'), findVis('석수'), color);
+                drawLine(findVis('평택'), findVis('성환'), color);
+                drawLine(findVis('온양온천'), findVis('신창'), color);
             }
             if (lineName === '2호선') { 
                 drawLine(findVis('충정로'), findVis('시청'), color); 
@@ -188,7 +192,13 @@ function App() {
             }
             if (lineName === '경의중앙선') { 
                 drawLine(findVis('가좌'), findVis('신촌'), color); 
-                drawLine(findVis('가좌'), findVis('홍대입구'), color); 
+                drawLine(findVis('가좌'), findVis('홍대입구'), color);
+            }
+            if (lineName === '김포골드라인') { 
+                drawLine(findVis('김포공항'), findVis('고촌'), color); 
+            }
+            if (lineName === '서해선') { 
+                drawLine(findVis('능곡'), findVis('김포공항'), color); 
             }
         });
 
