@@ -197,6 +197,9 @@ function App() {
             if (lineName === '김포골드라인') { 
                 drawLine(findVis('김포공항'), findVis('고촌'), color); 
             }
+            if (lineName === '신분당선') { 
+                drawLine(findVis('청계산입구'), findVis('판교'), color); 
+            }
             if (lineName === '서해선') { 
                 drawLine(findVis('능곡'), findVis('김포공항'), color); 
             }
