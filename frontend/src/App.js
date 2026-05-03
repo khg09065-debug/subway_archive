@@ -22,13 +22,12 @@ function App() {
     const [mapMode, setMapMode] = useState('dark');
     const [activeAnalysisBrand, setActiveAnalysisBrand] = useState(null);
 
-    // [추가] 캣멀-롬 스플라인: 점들을 부드럽게 잇는 알고리즘
+    // [고도화] 캣멀-롬 스플라인: 점들을 부드럽게 잇는 알고리즘
     const getSmoothPath = (points, segments = 12) => {
         if (points.length < 2) return points;
-        if (points.length === 2) return points; // 단순 직선
+        if (points.length === 2) return points; 
 
         const result = [];
-        // 가상의 제어점 추가 (시작과 끝의 곡률 처리)
         const p = [
             [2 * points[0][0] - points[1][0], 2 * points[0][1] - points[1][1]],
             ...points,
@@ -57,14 +56,21 @@ function App() {
         return result;
     };
 
-    // [기존 기능 유지] 데이터 로드 및 초기화
+    // 데이터 로드 및 전처리 (총신대입구 및 부산 동래역 분리 처리)
     useEffect(() => {
         axios.get('http://localhost:8000/api/stations')
             .then(res => {
-                const renamedData = res.data.map(st => ({
-                    ...st,
-                    역명: st.역명 === '이수' ? '총신대입구' : st.역명
-                }));
+                const renamedData = res.data.map(st => {
+                    let newName = st.역명;
+                    if (st.역명 === '이수') newName = '총신대입구';
+                    
+                    // 부산 동해선 동래역을 별개 역으로 구분
+                    if (st.역명 === '동래' && st.지역 === '부산' && st.노선명 === '동해선') {
+                        newName = '동래(동해선)';
+                    }
+                    
+                    return { ...st, 역명: newName };
+                });
                 const sortedData = renamedData.sort((a, b) => String(a.역번호).localeCompare(String(b.역번호)));
                 setAllStations(sortedData);
                 setRegions(['전체', ...new Set(renamedData.map(item => item.지역))]);
@@ -87,10 +93,7 @@ function App() {
 
     useEffect(() => {
         if (activeAnalysisBrand) {
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
+            if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
             return;
         }
 
@@ -114,7 +117,6 @@ function App() {
         const lineNames = [...new Set(allStations.map(s => s.노선명))];
         const renderedSegments = new Set();
 
-        // [핵심 수정] 선 그리기 함수: bridgeWaypoints를 곡선으로 처리
         const drawLine = (s1, s2, color) => {
             if (!s1 || !s2) return;
             const segmentKey = [s1.역명, s2.역명].sort().join('|') + color;
@@ -130,13 +132,8 @@ function App() {
             }
             rawPoints.push([s2.위도, s2.경도]);
 
-            let finalPoints;
-            // 직선 구간 설정이 되어있으면 그대로, 아니면 부드러운 곡선 적용
-            if (bridgePoint && isStraightSegment(pairKey)) {
-                finalPoints = rawPoints;
-            } else {
-                finalPoints = getSmoothPath(rawPoints);
-            }
+            // 직선 설정이 되어있으면 그대로, 아니면 부드러운 경로 적용
+            let finalPoints = (bridgePoint && isStraightSegment(pairKey)) ? rawPoints : getSmoothPath(rawPoints);
 
             L.polyline(finalPoints, { color, weight: 3, opacity: 0.6, smoothFactor: 1, lineJoin: 'round' }).addTo(polylineGroupRef.current);
             renderedSegments.add(segmentKey);
@@ -149,7 +146,6 @@ function App() {
 
             const color = lineColors[lineName] || '#9CA3AF';
 
-            // 기본 노선 연결
             for (let i = 0; i < stationsInLine.length - 1; i++) {
                 const s1 = stationsInLine[i];
                 const s2 = stationsInLine[i + 1];
@@ -158,25 +154,26 @@ function App() {
                 const dist = Math.sqrt(Math.pow(s1.위도 - s2.위도, 2) + Math.pow(s1.경도 - s2.경도, 2));
                 const isNaturalConnection = (s1.역명 === '별내별가람' && s2.역명 === '오남') || (s1.역명 === '오남' && s2.역명 === '진접');
                 const isException = ((s1.역명 === '오목천' && s2.역명 === '어천')) || ((s1.역명 === '마곡나루' && s2.역명 === '디지털미디어시티')) || ((s1.역명 === '강촌' && s2.역명 === '김유정'));
-                const relaxedLines = ['경강선', '경춘선', '공항철도', '경의중앙선', '수인분당선', '동해선', '대경선', '우이신설선', '4호선'];
+                const relaxedLines = ['경강선', '경춘선', '공항철도', '경의중앙선', '수인분당선', '동해선', '우이신설선', '1호선', '4호선', '대구1호선', '대경선'];
                 const maxDist = relaxedLines.includes(lineName) ? 0.8 : 0.05;
 
+                // 특정 오연결 구간 제외 로직
                 if (lineName === '1호선' && ((s1.역명 === '석수' && s2.역명 === '광명') || (s1.역명 === '광명' && s2.역명 === '석수'))) continue;
                 if (lineName === '경의중앙선' && ((s1.역명 === '홍대입구' && s2.역명 === '서울역') || (s2.역명 === '홍대입구' && s1.역명 === '서울역'))) continue;
+                
                 if (dist > maxDist && !isException && !isNaturalConnection) continue;
 
                 drawLine(s1, s2, color);
             }
 
-            // 분기점 및 인공적 연결 로직 (부드러운 선 적용됨)
             const findVis = (name) => stationsInLine.find(s => s.역명 === name && visibleKeys.has(s.역명 + s.노선명));
+            
+            // 인공적 연결 및 분기점 로직
             if (lineName === '1호선') { 
                 drawLine(findVis('구로'), findVis('구일'), color); 
                 drawLine(findVis('구로'), findVis('가산디지털단지'), color); 
                 drawLine(findVis('연천'), findVis('전곡'), color); 
-                drawLine(findVis('금천구청'), findVis('석수'), color);
-                drawLine(findVis('평택'), findVis('성환'), color);
-                drawLine(findVis('온양온천'), findVis('신창'), color);
+                drawLine(findVis('금천구청'), findVis('광명'), color); 
             }
             if (lineName === '2호선') { 
                 drawLine(findVis('충정로'), findVis('시청'), color); 
@@ -194,18 +191,8 @@ function App() {
                 drawLine(findVis('가좌'), findVis('신촌'), color); 
                 drawLine(findVis('가좌'), findVis('홍대입구'), color);
             }
-            if (lineName === '김포골드라인') { 
-                drawLine(findVis('김포공항'), findVis('고촌'), color); 
-            }
-            if (lineName === '신분당선') { 
-                drawLine(findVis('청계산입구'), findVis('판교'), color); 
-            }
-            if (lineName === '서해선') { 
-                drawLine(findVis('능곡'), findVis('김포공항'), color); 
-            }
         });
 
-        // 마커 렌더링
         displayStations.forEach(st => {
             const squareIcon = L.divIcon({
                 className: 'custom-square-marker',
@@ -227,7 +214,9 @@ function App() {
                 <div className="sidebar-top">
                     <h1>전국 역세권 상권분석</h1>
                     <div className="region-tabs">
-                        {regions.map(r => (<button key={r} className={filterRegion === r ? 'active' : ''} onClick={() => setFilterRegion(r)}>{r}</button>))}
+                        {regions.map(r => (
+                            <button key={r} className={filterRegion === r ? 'active' : ''} onClick={() => setFilterRegion(r)}>{r}</button>
+                        ))}
                     </div>
                     <div className="content-area">
                         {selectedStation ? (
@@ -275,11 +264,15 @@ function App() {
                                     <div className="brand-button-container">
                                         <div className="brand-col">
                                             <span className="col-label premium">Premium</span>
-                                            {brandCategories.premium.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
+                                            {brandCategories.premium.map(brand => (
+                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
+                                            ))}
                                         </div>
                                         <div className="brand-col">
                                             <span className="col-label budget">Value</span>
-                                            {brandCategories.value.map(brand => (<button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>))}
+                                            {brandCategories.value.map(brand => (
+                                                <button key={brand} className="brand-tag-btn" onClick={() => setActiveAnalysisBrand(brand)}>{brand}</button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
