@@ -71,3 +71,28 @@ subway_archive/
 │
 └── requirements.txt                  # Python 의존성 패키지
 ```
+
+## 6. 기술 스택 (Tech Stack)  
+### Backend (Python 3.8+)  
+
+| 라이브러리 | 용도 | 비고 |
+| :--- | :--- | :--- |
+| **sklearn** | AI 모델 | |
+| **NumPy** | 벡터 연산 | |
+| **Pandas** | 마스터 데이터 처리 | |
+| **KMeans** | 상권 성격 클러스터링 | |
+| **StandardScaler** | 전철역 데이터 스케일링 | |
+| **Flask** | REST API 서버 지원 | |
+| **SQLAlchemy** | DB 연결 엔진 |  |
+| **math** | 역과 카페간의 거리 계산 | |
+
+### Frontend (Node.js 16+ / React)  
+
+| 라이브러리 | 용도 | 비고 |
+| :--- | :--- | :--- |
+| **React 19** | UI 라이브러리 | Hooks, State 관리 |
+| **Axios** | HTTP 클라이언트 | API 통신 |
+| **React Scripts** | 빌드 도구 | Create React App |
+| **Concurrently** | 개발 도구 | Front/Back 동시 실행 |
+| **leaflet** | 라이브러리 | 지도 구현 |
+
