@@ -42,8 +42,32 @@
 - 노선별로 어떤 전철역이 있나 볼 수 있다.
 - 역을 클릭하면 반경 500m에서 브랜드 입점 역 반경 500m의 브랜드 체인점을 다 볼 수 있다.
 
-### 4.데이터 수집 과정
+### 4. 데이터 수집 과정
 - 커피 프랜차이즈 15지점은 각 프랜차이즈 공식사이트에 들어가서 데이터를 수집
 - 전철역 데이터는 공공 데이터 포털을 통해 데이터 수집
 - 커피 체인점에 대한 정보는 MySQL
 - 전철역 데이터는 (backend/전체_역사정보_최종_정제_v58.csv)
+
+### 5. 디렉토리 구조
+```
+subway_archive/
+├── backend/                          # Flask 기반 백엔드 서버
+│   ├── app.py                        # 프로덕션 Flask 애플리케이션 (MySQL 연동 및 CSV파일 연동)
+│   ├── 전체_역사정보_최종_정제_v58.csv                        # 전철역 리스트(출처 : 공공 데이터 포탈)
+
+│
+├── frontend/                         # React 기반 프론트엔드
+│   ├── src/
+│   │   ├── App.js                    # 메인 라우팅 및 상태 관리
+│   │   ├── BrandAnalyzer.js            # 커피 브랜드별 전철역 간의 거리 파악
+│   │   ├── bridgeWaypoints.js           # 전철 노선도 세부화
+│   │   ├── constant.js                   # 전철역 노선 색깔 및 클러스터링 값 관리
+│   │   └── ... (CSS 및 컴포넌트)
+│   ├── public/
+│   ├── concurrently
+│   ├── frontend@0.1.0
+│   ├── package-lock.json
+│   └── package.json
+│
+└── requirements.txt                  # Python 의존성 패키지
+```
