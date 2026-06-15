@@ -48,7 +48,7 @@
 - 커피 체인점에 대한 정보는 MySQL
 - 전철역 데이터는 (backend/전체_역사정보_최종_정제_v58.csv)
 
-## 5. 디렉토리 구조
+## 디렉토리 구조
 ```
 subway_archive/
 ├── backend/                          # Flask 기반 백엔드 서버
@@ -72,7 +72,7 @@ subway_archive/
 └── requirements.txt                  # Python 의존성 패키지
 ```
 
-## 6. 기술 스택 (Tech Stack)  
+## 기술 스택 (Tech Stack)  
 ### Backend (Python 3.8+)  
 
 | 라이브러리 | 용도 | 비고 |
