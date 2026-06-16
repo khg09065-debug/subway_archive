@@ -73,7 +73,7 @@ subway_archive/
 ```
 
 ## 기술 스택 (Tech Stack)  
-### Backend (Python 3.8+)  
+### Backend (Python 3.13)  
 
 | 라이브러리 | 용도 | 비고 |
 | :--- | :--- | :--- |
