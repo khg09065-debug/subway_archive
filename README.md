@@ -106,3 +106,26 @@ subway_archive/
 | **Concurrently** | 개발 도구 | Front/Back 동시 실행 |
 | **leaflet** | 라이브러리 | 지도 구현 |
 
+## 설치 및 실행 방법
+
+#### 1. 환경 변수 설정(.env)
+프로젝트 루트에 .env 파일을 생성한 뒤, 구축되어 있는 DB의 연결정보를 다음과 같이 입력합니다.
+
+DB_HOST=your_local_host  
+DB_USER=your_username  
+DB_PASSWORD=your_password  
+DB_NAME=your_db_name
+
+#### 2. 의존성 설치
+- cd backend <br>
+  pip install -r requirements.txt (백엔드)
+
+- cd frontend <br>
+  npm install (프론트엔드)
+
+#### 3. 카페 브랜드 데이터, 전철역 데이터
+- .env를 통해 자신의 서버에 접속 후 테이블 불러오기 (카페 브랜드 데이터)
+- 저장된 csv파일을 통해 데이터 로드(전철역 데이터)
+
+#### (참고) 백엔드 데이터 불러오기
+python app.py             # 프로덕션 모드
