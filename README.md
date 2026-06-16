@@ -128,4 +128,4 @@ DB_NAME=your_db_name
 - 저장된 csv파일을 통해 데이터 로드(전철역 데이터)
 
 #### (참고) 백엔드 데이터 불러오기
-python app.py             # 프로덕션 모드
+- python app.py             # 프로덕션 모드
