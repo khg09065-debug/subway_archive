@@ -72,8 +72,8 @@ export const brandCategories = {
   ]
 };
 
-// 지도 타일 소스 (라이트/다크 모드)
+// 지도 타일 소스 (라이트: 일반 도로지도 / 다크: 동일 도로지도 기반 검정색 테마)
 export const tileLayers = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  light: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  dark: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 };
